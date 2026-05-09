@@ -1071,18 +1071,22 @@
     }
 
     async function analyzeResumeWithGroq(jdText, resumeText, jdRequirements) {
-      const GROQ_API_KEY = localStorage.getItem('groq_api_key') || prompt('Enter your Groq API key (get it from console.groq.com):');
+      let GROQ_API_KEY = localStorage.getItem('groq_api_key');
       
       if (!GROQ_API_KEY) {
-        throw new Error('Groq API key is required. Get one from https://console.groq.com');
-      }
-      
-      // Save for future use
-      if (!localStorage.getItem('groq_api_key')) {
-        localStorage.setItem('groq_api_key', GROQ_API_KEY);
+        GROQ_API_KEY = prompt('Enter your Groq API key (get it from console.groq.com):\n\nYour key will be saved in browser for future use.');
+        
+        if (!GROQ_API_KEY || GROQ_API_KEY.trim() === '') {
+          throw new Error('Groq API key is required. Get one from https://console.groq.com');
+        }
+        
+        // Save for future use
+        localStorage.setItem('groq_api_key', GROQ_API_KEY.trim());
       }
       
       const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+
+      console.log('Calling Groq AI API for resume analysis...');
 
       const prompt = `You are an expert HR recruiter analyzing candidate resumes against job descriptions.
 
@@ -1128,11 +1132,21 @@ Be strict and realistic. Only return valid JSON, no additional text.`;
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Groq API Error:', errorData);
+        
+        // If API key is invalid, clear it and ask again
+        if (response.status === 401 || response.status === 403) {
+          localStorage.removeItem('groq_api_key');
+          throw new Error('Invalid API key. Please check your Groq API key and try again.');
+        }
+        
         throw new Error(`Groq API error: ${errorData.error?.message || response.statusText}`);
       }
 
       const data = await response.json();
+      console.log('Groq AI Response:', data);
+      
       const content = data.choices[0].message.content;
 
       // Parse JSON response
