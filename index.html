@@ -1071,103 +1071,34 @@
     }
 
     async function analyzeResumeWithGroq(jdText, resumeText, jdRequirements) {
-      let GROQ_API_KEY = localStorage.getItem('groq_api_key');
-      
-      if (!GROQ_API_KEY) {
-        GROQ_API_KEY = prompt('Enter your Groq API key (get it from console.groq.com):\n\nYour key will be saved in browser for future use.');
-        
-        if (!GROQ_API_KEY || GROQ_API_KEY.trim() === '') {
-          throw new Error('Groq API key is required. Get one from https://console.groq.com');
-        }
-        
-        // Save for future use
-        localStorage.setItem('groq_api_key', GROQ_API_KEY.trim());
-      }
-      
-      const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+      console.log('Calling Netlify Function for AI analysis...');
 
-      console.log('Calling Groq AI API for resume analysis...');
-
-      const prompt = `You are an expert HR recruiter analyzing candidate resumes against job descriptions.
-
-Job Description:
-${jdText}
-
-Candidate Resume:
-${resumeText}
-
-Analyze this candidate's fit for the role and provide a JSON response with the following structure:
-{
-  "score": <number 0-100>,
-  "tier": "strong" | "maybe" | "skip",
-  "matchedSkills": ["skill1", "skill2", ...],
-  "missingSkills": ["skill1", "skill2", ...],
-  "reasoning": "<detailed explanation of the score>"
-}
-
-Scoring criteria:
-- 75-100: Strong match (tier: "strong") - Most required skills present, experience fits well
-- 55-74: Moderate match (tier: "maybe") - Some skills present, may need evaluation
-- 0-54: Poor match (tier: "skip") - Significant skill gaps
-
-Be strict and realistic. Only return valid JSON, no additional text.`;
-
-      const response = await fetch(GROQ_API_URL, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${GROQ_API_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
-          messages: [
-            {
-              role: 'user',
-              content: prompt
-            }
-          ],
-          temperature: 0.3,
-          max_tokens: 1000
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('Groq API Error:', errorData);
-        
-        // If API key is invalid, clear it and ask again
-        if (response.status === 401 || response.status === 403) {
-          localStorage.removeItem('groq_api_key');
-          throw new Error('Invalid API key. Please check your Groq API key and try again.');
-        }
-        
-        throw new Error(`Groq API error: ${errorData.error?.message || response.statusText}`);
-      }
-
-      const data = await response.json();
-      console.log('Groq AI Response:', data);
-      
-      const content = data.choices[0].message.content;
-
-      // Parse JSON response
-      let analysis;
       try {
-        // Try to extract JSON if wrapped in markdown code blocks
-        const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, content];
-        analysis = JSON.parse(jsonMatch[1].trim());
-      } catch (e) {
-        console.error('Failed to parse Groq response:', content);
-        throw new Error('Invalid response format from AI');
-      }
+        const response = await fetch('/.netlify/functions/analyze-resume', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            jdText: jdText,
+            resumeText: resumeText
+          })
+        });
 
-      // Validate and sanitize response
-      return {
-        score: Math.min(100, Math.max(0, parseInt(analysis.score) || 50)),
-        tier: ['strong', 'maybe', 'skip'].includes(analysis.tier) ? analysis.tier : 'maybe',
-        matchedSkills: Array.isArray(analysis.matchedSkills) ? analysis.matchedSkills.slice(0, 15) : [],
-        missingSkills: Array.isArray(analysis.missingSkills) ? analysis.missingSkills.slice(0, 10) : [],
-        reasoning: analysis.reasoning || 'No reasoning provided.'
-      };
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('API Error:', errorData);
+          throw new Error(errorData.error || 'Failed to analyze resume');
+        }
+
+        const analysis = await response.json();
+        console.log('AI Analysis Result:', analysis);
+
+        return analysis;
+      } catch (error) {
+        console.error('Error calling Netlify Function:', error);
+        throw error;
+      }
     }
 
     function parseJobDescription(jdText) {

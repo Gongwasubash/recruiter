@@ -33,3 +33,8 @@ yarn-error.log*
 # Temporary files
 *.tmp
 *.temp
+
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock

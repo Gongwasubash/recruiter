@@ -1,0 +1,8 @@
+{
+  "name": "subashjobanalyser",
+  "version": "1.0.0",
+  "description": "AI-powered resume screening tool",
+  "dependencies": {
+    "node-fetch": "^2.6.7"
+  }
+}
